@@ -1,0 +1,36 @@
+PASS  Titan embeddings        dim=1024
+PASS  Claude Haiku 4.5        'OK'
+
+----------------------------------------------------------------------------------------------------------------------------------
+|                                                        ListServiceQuotas                                                       |
++-----------------------------------------------------------------------------------------------------------+-----------+--------+
+|  Model units per provisioned model for Amazon Titan Text Embeddings V2                                    |  0.0      |  True  |
+|  Batch inference input file size (in GB) for Titan Text Embeddings V2                                     |  1.0      |  False |
+|  Sum of in-progress and submitted batch inference jobs using a base model for Titan Text Embeddings V2    |  100.0    |  True  |
+|  Sum of in-progress and submitted batch inference jobs using a custom model for Titan Text Embeddings V2  |  3.0      |  False |
+|  On-demand model inference requests per minute for Amazon Titan Text Embeddings V2                        |  600.0    |  False |
+|  Records per batch inference job for Titan Text Embeddings V2                                             |  100000.0 |  True  |
+|  Minimum number of records per batch inference job for Titan Text Embeddings V2                           |  100.0    |  False |
+|  Records per input file per batch inference job for Titan Text Embeddings V2                              |  100000.0 |  True  |
+|  On-demand model inference tokens per minute for Amazon Titan Text Embeddings V2                          |  300000.0 |  False |
+|  Batch inference job size (in GB) for Titan Text Embeddings V2                                            |  5.0      |  False |
++-----------------------------------------------------------------------------------------------------------+-----------+--------+
+-------------------------------------------------------------------------------------------------------------------------
+|                                                   ListServiceQuotas                                                   |
++-------------------------------------------------------------------------------------------------+------------+--------+
+|  Cross-region model inference requests per minute for Anthropic Claude Haiku 4.5                |  50.0      |  True  |
+|  Cross-region model inference tokens per minute for Anthropic Claude Haiku 4.5                  |  5000000.0 |  True  |
+|  Global cross-region model inference tokens per minute for Anthropic Claude Haiku 4.5           |  5000000.0 |  True  |
+|  Batch inference input file size (in GB) for Claude Haiku 4.5                                   |  1.0       |  False |
+|  Records per input file per batch inference job for Claude Haiku 4.5                            |  100000.0  |  True  |
+|  Records per batch inference job for Claude Haiku 4.5                                           |  100000.0  |  True  |
+|  Batch inference job size (in GB) for Claude Haiku 4.5                                          |  5.0       |  False |
+|  Global cross-region model inference requests per minute for Anthropic Claude Haiku 4.5         |  50.0      |  True  |
+|  Sum of in-progress and submitted batch inference jobs using a base model for Claude Haiku 4.5  |  100.0     |  True  |
+|  Minimum number of records per batch inference job for Claude Haiku 4.5                         |  100.0     |  False |
++-------------------------------------------------------------------------------------------------+------------+--------+
+
+
+My account has the default quotas from AWS. 5,000,000 tokens/min and 50 requests/min for Claude Haiku 4.5, and 300,000 tokens/min and 600 requests/min for Titan Text Embeddings V2. I estimate Lab 3's peak generation load at about 50,000 tokens/min and 20 requests/min. I figured that I have no actual data to base it on besides the Lab 3 workload. It described in the handout that it will be embedding a ~5.5k-token corpus a few dozen times, and have a few hundred generation calls for RAGAS evaluation. Thats roughly 50,000 tokens/min and 20 requests/min for Claude Haiku 4.5. For Titan its about 10k tokens/min. The defaults (5M tokens/min and 50 requests/min for Haiku; 300k tokens/min and 600 requests/min for Titan) are above what will be needed for the lab. 
+
+
