@@ -1,0 +1,41 @@
+]633;E;{   echo "=== 1. On-demand ml.m5.large training (L-611FA074): default vs applied ==="\x3b   echo "Region: $(aws configure get region)"\x3b   aws service-quotas get-aws-default-service-quota --service-code sagemaker --quota-code L-611FA074     --query 'Quota.{Name:QuotaName,Default:Value}' --output json\x3b   aws service-quotas get-service-quota --service-code sagemaker --quota-code L-611FA074     --query 'Quota.{Name:QuotaName,Applied:Value}' --output json\x3b   echo\x3b   echo "=== 2. On-demand increase request status ==="\x3b   aws service-quotas list-requested-service-quota-change-history-by-quota     --service-code sagemaker --quota-code L-611FA074     --query 'RequestedQuotas[].{Status:Status,Requested:DesiredValue,Case:CaseId}' --output table\x3b   echo "Current applied value: $(aws service-quotas get-service-quota --service-code sagemaker \\\x0a--quota-code L-611FA074 --query 'Quota.Value' --output text)"\x3b   echo\x3b   echo "=== Fallback: spot ml.m5.large training (L-29688C85): default vs applied ==="\x3b   aws service-quotas get-aws-default-service-quota --service-code sagemaker --quota-code L-29688C85     --query 'Quota.{Name:QuotaName,Default:Value}' --output json\x3b   aws service-quotas get-service-quota --service-code sagemaker --quota-code L-29688C85     --query 'Quota.{Name:QuotaName,Applied:Value}' --output json\x3b   echo\x3b   echo "=== Spot increase request status ==="\x3b   aws service-quotas list-requested-service-quota-change-history-by-quota     --service-code sagemaker --quota-code L-29688C85     --query 'RequestedQuotas[].{Status:Status,Requested:DesiredValue,Case:CaseId}' --output table\x3b   echo\x3b   echo "=== 3. Justification ==="\x3b } > docs/training-quota-verification.txt;86b79cc5-9eb1-4f09-b330-32e4ec90e5f5]633;C=== 1. On-demand ml.m5.large training (L-611FA074): default vs applied ===
+Region: us-east-1
+{
+    "Name": "ml.m5.large for training job usage",
+    "Default": 0.0
+}
+{
+    "Name": "ml.m5.large for training job usage",
+    "Applied": 0.0
+}
+
+=== 2. On-demand increase request status ===
+-------------------------------------------------
+| ListRequestedServiceQuotaChangeHistoryByQuota |
++-----------------+-------------+---------------+
+|      Case       |  Requested  |    Status     |
++-----------------+-------------+---------------+
+|  179073467200905|  2.0        |  CASE_OPENED  |
++-----------------+-------------+---------------+
+Current applied value: 0.0
+
+=== Fallback: spot ml.m5.large training (L-29688C85): default vs applied ===
+{
+    "Name": "ml.m5.large for spot training job usage",
+    "Default": 4.0
+}
+{
+    "Name": "ml.m5.large for spot training job usage",
+    "Applied": 0.0
+}
+
+=== Spot increase request status ===
+-------------------------------------------------
+| ListRequestedServiceQuotaChangeHistoryByQuota |
++-----------------+-------------+---------------+
+|      Case       |  Requested  |    Status     |
++-----------------+-------------+---------------+
+|  179073483800789|  5.0        |  CASE_OPENED  |
++-----------------+-------------+---------------+
+
+=== 3. Justification ===
