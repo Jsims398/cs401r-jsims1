@@ -15,3 +15,15 @@ variable "aws_region" {
   type        = string
   default     = "us-east-1"
 }
+
+variable "enable_nat_gateway" {
+  description = "Whether to enable a NAT gateway for the private subnet"
+  type        = bool
+  default     = false
+}
+
+variable "enable_lifecycle_rules" {
+  description = "Whether to enable lifecycle rules"
+  type        = bool
+  default     = false
+}

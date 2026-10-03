@@ -22,8 +22,20 @@ variable "public_subnet_cidr" {
   default     = "10.0.100.0/24"
 }
 
+variable "private_subnet_cidr" {
+  description = "CIDR block for the private subnet"
+  type        = string
+  default     = "10.0.1.0/24"
+}
+
 variable "availability_zone" {
   description = "Availability Zone for the public subnet"
   type        = string
   default     = "us-east-1a"
+}
+
+variable "enable_nat_gateway" {
+  description = "Create the NAT Gateway and private routing. False in environments/local (LocalStack Community has no NAT Gateway)."
+  type        = bool
+  default     = true
 }

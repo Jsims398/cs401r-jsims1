@@ -1,41 +1,57 @@
-]633;E;{   echo "=== 1. On-demand ml.m5.large training (L-611FA074): default vs applied ==="\x3b   echo "Region: $(aws configure get region)"\x3b   aws service-quotas get-aws-default-service-quota --service-code sagemaker --quota-code L-611FA074     --query 'Quota.{Name:QuotaName,Default:Value}' --output json\x3b   aws service-quotas get-service-quota --service-code sagemaker --quota-code L-611FA074     --query 'Quota.{Name:QuotaName,Applied:Value}' --output json\x3b   echo\x3b   echo "=== 2. On-demand increase request status ==="\x3b   aws service-quotas list-requested-service-quota-change-history-by-quota     --service-code sagemaker --quota-code L-611FA074     --query 'RequestedQuotas[].{Status:Status,Requested:DesiredValue,Case:CaseId}' --output table\x3b   echo "Current applied value: $(aws service-quotas get-service-quota --service-code sagemaker \\\x0a--quota-code L-611FA074 --query 'Quota.Value' --output text)"\x3b   echo\x3b   echo "=== Fallback: spot ml.m5.large training (L-29688C85): default vs applied ==="\x3b   aws service-quotas get-aws-default-service-quota --service-code sagemaker --quota-code L-29688C85     --query 'Quota.{Name:QuotaName,Default:Value}' --output json\x3b   aws service-quotas get-service-quota --service-code sagemaker --quota-code L-29688C85     --query 'Quota.{Name:QuotaName,Applied:Value}' --output json\x3b   echo\x3b   echo "=== Spot increase request status ==="\x3b   aws service-quotas list-requested-service-quota-change-history-by-quota     --service-code sagemaker --quota-code L-29688C85     --query 'RequestedQuotas[].{Status:Status,Requested:DesiredValue,Case:CaseId}' --output table\x3b   echo\x3b   echo "=== 3. Justification ==="\x3b } > docs/training-quota-verification.txt;86b79cc5-9eb1-4f09-b330-32e4ec90e5f5]633;C=== 1. On-demand ml.m5.large training (L-611FA074): default vs applied ===
-Region: us-east-1
-{
+1.
+$ aws service-quotas get-aws-default-service-quota \
+  --service-code sagemaker --quota-code L-611FA074 \
+  --query 'Quota.{Name:QuotaName,Default:Value}' --output json
+{                                                                                                                                                                                                                  
     "Name": "ml.m5.large for training job usage",
     "Default": 0.0
 }
-{
+$ aws service-quotas get-service-quota \
+  --service-code sagemaker --quota-code L-611FA074 \
+  --query 'Quota.{Name:QuotaName,Applied:Value}' --output json
+{                                                                                                                                                                                                                  
     "Name": "ml.m5.large for training job usage",
     "Applied": 0.0
 }
-
-=== 2. On-demand increase request status ===
--------------------------------------------------
-| ListRequestedServiceQuotaChangeHistoryByQuota |
-+-----------------+-------------+---------------+
-|      Case       |  Requested  |    Status     |
-+-----------------+-------------+---------------+
-|  179073467200905|  2.0        |  CASE_OPENED  |
-+-----------------+-------------+---------------+
-Current applied value: 0.0
-
-=== Fallback: spot ml.m5.large training (L-29688C85): default vs applied ===
-{
-    "Name": "ml.m5.large for spot training job usage",
-    "Default": 4.0
+2.
+aws service-quotas request-service-quota-increase \
+  --service-code sagemaker --quota-code L-611FA074 \
+  --desired-value 2
+{                                                                                                                                                                                                                  
+    "RequestedQuota": {
+        "Id": "dbf1000173ca4049a16be1c61969b811gJwotUAI",
+        "ServiceCode": "sagemaker",
+        "ServiceName": "Amazon SageMaker",
+        "QuotaCode": "L-611FA074",
+        "QuotaName": "ml.m5.large for training job usage",
+        "DesiredValue": 2.0,
+        "Status": "PENDING",
+        "Created": "2026-09-29T20:14:50.805000-06:00",
+        "Requester": "{\"accountId\":\"761641207876\",\"callerArn\":\"arn:aws:iam::761641207876:user/cs401r-lab\"}",
+        "QuotaArn": "arn:aws:servicequotas:us-east-1:761641207876:sagemaker/L-611FA074",
+        "GlobalQuota": false,
+        "Unit": "None",
+        "QuotaRequestedAtLevel": "ACCOUNT"
+    }
 }
-{
+aws service-quotas list-requested-service-quota-change-history-by-quota \
+  --service-code sagemaker --quota-code L-611FA074 \
+  --query 'RequestedQuotas[].{Status:Status,Requested:DesiredValue,Case:CaseId}' \
+  --output table
+-----------------------------------------------                                                                                                                                                                    
+|ListRequestedServiceQuotaChangeHistoryByQuota|
++----------+------------------+---------------+
+|   Case   |    Requested     |    Status     |
++----------+------------------+---------------+
+|  None    |  2.0             |  PENDING      |
++----------+------------------+---------------+
+
+aws service-quotas get-service-quota \
+  --service-code sagemaker --quota-code L-29688C85 \
+  --query 'Quota.{Name:QuotaName,Applied:Value}' --output json
+{                                                                                                                                                                                                                  
     "Name": "ml.m5.large for spot training job usage",
     "Applied": 0.0
 }
-
-=== Spot increase request status ===
--------------------------------------------------
-| ListRequestedServiceQuotaChangeHistoryByQuota |
-+-----------------+-------------+---------------+
-|      Case       |  Requested  |    Status     |
-+-----------------+-------------+---------------+
-|  179073483800789|  5.0        |  CASE_OPENED  |
-+-----------------+-------------+---------------+
-
-=== 3. Justification ===
+I requested 2 on-demand instances like the prelab said to. The spot fallback showed a default of 4 but an applied value of 0 
+on my account. So filed a spot request for 5, the minimum the API accepts above the default, and it's now an open case.

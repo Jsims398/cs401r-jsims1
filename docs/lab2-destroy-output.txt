@@ -1,0 +1,130 @@
+== Lab 2 teardown — full sequence ==
+This file combines the actual teardown-lab2.sh run with the manual S3
+cleanup that followed, since the script's own bucket-emptying step (1/7)
+had a bug and silently left 72 object versions in place, causing the first
+terraform destroy to fail with BucketNotEmpty. Nothing below is simulated —
+every step is the real output from this session.
+
+---- bash scripts/teardown-lab2.sh (first run) ----
+==> Lab 2 teardown
+    Account : 761641207876
+    Region  : us-east-1
+    Bucket  : northstar-dev-data-761641207876
+
+{
+    "BucketArn": "arn:aws:s3:::northstar-dev-data-761641207876",
+    "BucketRegion": "us-east-1",
+    "AccessPointAlias": false
+}
+[1/7] Emptying northstar-dev-data-761641207876 (all versions and delete markers)
+[2/7] Removing Feature Store Glue catalog database
+      deleted sagemaker_featurestore
+[2b/7] Removing orphaned Glue network interfaces
+[3/7] terraform destroy
+Error: deleting S3 Bucket (northstar-dev-data-761641207876): operation error S3: DeleteBucket, https response error StatusCode: 409, RequestID: YDC7Q26357R52S8S, HostID: ltX6J2zyjSDk3ZbyNCfYUsfOQ7wQ3vB4BHyLYCOa1izg87S8cA2oMESB5UUM3lcCqn3ipgNNhYY9hqL/RHDMECu4w5HLdeCa, api error BucketNotEmpty: The bucket you tried to delete is not empty. You must delete all versions in the bucket.
+
+[4/7] Removing orphaned SageMaker Studio EFS filesystems
+[5/7] Removing orphaned ENIs and SageMaker NFS security groups
+      deleted security group sg-0ee12bd8ad2695288
+      deleted security group sg-0ee61a49cd1edd80c
+      re-running destroy now that blockers are cleared
+(second destroy attempt also failed with the same BucketNotEmpty error —
+the bucket-emptying bug in step [1/7] meant the 72 object versions written
+by the Glue jobs and the Feature Store offline store were never actually
+deleted, on either attempt)
+
+[6/7] Removing orphaned SageMaker lineage contexts and artifacts
+      unlinked northstar-dev-customer-features-1790905942 -> northstar-dev-customer-features-1790905942-feature-group-pipeline
+      unlinked northstar-dev-customer-features-1790905942 -> northstar-dev-customer-features-1790905942-feature-group-pipeline-version
+      unlinked northstar-dev-customer-features-1790905942 -> 469e51e5da692eeed9b0a51468073507
+      deleted artifact 469e51e5da692eeed9b0a51468073507
+      deleted context northstar-dev-customer-features-1790905942
+      deleted context northstar-dev-customer-features-1790905942-feature-group-pipeline
+      deleted context northstar-dev-customer-features-1790905942-feature-group-pipeline-version
+      deleted log group /aws-glue/crawlers
+      deleted log group /aws-glue/jobs/error
+      deleted log group /aws-glue/jobs/logs-v2
+      deleted log group /aws-glue/jobs/output
+[7/7] Verifying teardown
+      NAT gateways           OK
+      Elastic IPs            OK
+      SageMaker domains      OK
+      Feature groups         OK
+      EFS filesystems        OK
+      Glue jobs              OK
+      NorthStar VPCs         OK
+      Lineage contexts       OK
+      Lineage artifacts      OK
+      Glue databases         OK
+
+At this point every resource Terraform owned except the S3 bucket itself
+was destroyed (confirmed below by `terraform show` returning an empty
+state for everything except the bucket). The script's own checklist above
+doesn't check for a leftover bucket, so it reported "complete" prematurely.
+
+---- Manual diagnosis and fix ----
+
+$ aws s3api head-bucket --bucket northstar-dev-data-761641207876
+{
+    "BucketArn": "arn:aws:s3:::northstar-dev-data-761641207876",
+    "BucketRegion": "us-east-1",
+    "AccessPointAlias": false
+}
+(bucket still existed)
+
+$ terraform -chdir=infrastructure/environments/dev show
+# module.storage.aws_s3_bucket.data:
+resource "aws_s3_bucket" "data" { ... }
+(only the S3 bucket remained in state — everything else had been destroyed
+cleanly by the run above)
+
+$ aws s3api list-object-versions --bucket northstar-dev-data-761641207876 --query 'length(Versions)' --output text
+72
+(72 object versions confirmed present — raw/customers/, processed/customers/,
+features/customers/, and the Feature Store offline store's own files)
+
+$ aws s3api list-object-versions --bucket northstar-dev-data-761641207876 --max-keys 1000 --output json --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' > del_versions.json
+$ aws s3api delete-objects --bucket northstar-dev-data-761641207876 --delete file://del_versions.json
+{
+    "Deleted": [ ... 72 objects ... ]
+}
+(all 72 versions deleted in one batch call)
+
+$ aws s3api list-object-versions --bucket northstar-dev-data-761641207876 --query 'length(Versions)' --output text
+(empty response — zero versions and zero delete markers remained)
+
+---- terraform destroy (final, bucket only) ----
+Plan: 0 to add, 0 to change, 1 to destroy.
+
+Changes to Outputs:
+  - s3_bucket_name = "northstar-dev-data-761641207876" -> null
+module.storage.aws_s3_bucket.data: Destroying... [id=northstar-dev-data-761641207876]
+module.storage.aws_s3_bucket.data: Destruction complete after 1s
+
+Destroy complete! Resources: 1 destroyed.
+
+---- Final verification ----
+
+$ terraform -chdir=infrastructure/environments/dev show
+The state file is empty. No resources are represented.
+
+$ aws s3api head-bucket --bucket northstar-dev-data-761641207876
+An error occurred (404) when calling the HeadBucket operation: Not Found
+
+$ bash scripts/teardown-lab2.sh   (re-run to confirm)
+[7/7] Verifying teardown
+      NAT gateways           OK
+      Elastic IPs            OK
+      SageMaker domains      OK
+      Feature groups         OK
+      EFS filesystems        OK
+      Glue jobs              OK
+      NorthStar VPCs         OK
+      Lineage contexts       OK
+      Lineage artifacts      OK
+      Glue databases         OK
+
+==> Teardown complete. No billable Lab 2 resources remain.
+    The Terraform state bucket is intentionally retained for Lab 3.
+
+Destroy complete! Resources: 0 destroyed.

@@ -99,3 +99,162 @@ resource "aws_iam_role_policy_attachment" "ml_engineer" {
   role       = aws_iam_role.ml_engineer.name
   policy_arn = aws_iam_policy.ml_engineer.arn
 }
+
+resource "aws_iam_role" "data_engineer" {
+  name = "${var.project}-${var.environment}-DataEngineer"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = [
+            "glue.amazonaws.com",
+            "lambda.amazonaws.com",
+            "sagemaker.amazonaws.com"
+          ]
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+  tags = { Name = "${var.project}-${var.environment}-DataEngineer" }
+}
+
+resource "aws_iam_policy" "data_engineer" {
+  name        = "${var.project}-${var.environment}-DataEngineerPolicy"
+  description = "Least-privilege policy for the DataEngineer Glue/Lambda execution role"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "GlueFullAccess"
+        Effect   = "Allow"
+        Action   = ["glue:*"]
+        Resource = "*"
+      },
+      {
+        Sid    = "ENILifecycle"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateNetworkInterface", "ec2:DeleteNetworkInterface",
+          "ec2:DescribeNetworkInterfaces", "ec2:DescribeSecurityGroups",
+          "ec2:DescribeSubnets", "ec2:DescribeVpcAttribute", "ec2:DescribeVpcEndpoints",
+          "ec2:DescribeRouteTables"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid      = "ENITags"
+        Effect   = "Allow"
+        Action   = ["ec2:CreateTags", "ec2:DeleteTags"]
+        Resource = "arn:aws:ec2:*:*:network-interface/*"
+      },
+      {
+        Sid    = "S3RawProcessedFeatures"
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        Resource = [
+          "arn:aws:s3:::${var.project}-${var.environment}-data-*/raw/*",
+          "arn:aws:s3:::${var.project}-${var.environment}-data-*/processed/*",
+          "arn:aws:s3:::${var.project}-${var.environment}-data-*/features/*"
+        ]
+      },
+      {
+        Sid      = "S3ArtifactsGlueScriptsRead"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = "arn:aws:s3:::${var.project}-${var.environment}-data-*/artifacts/glue/*"
+      },
+      {
+        Sid      = "S3BucketList"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket", "s3:GetBucketLocation", "s3:GetBucketAcl"]
+        Resource = "arn:aws:s3:::${var.project}-${var.environment}-data-*"
+      },
+      {
+        Sid      = "FeatureStoreOfflineStoreACL"
+        Effect   = "Allow"
+        Action   = ["s3:PutObjectAcl"]
+        Resource = "arn:aws:s3:::${var.project}-${var.environment}-data-*/features/*"
+      },
+      {
+        Sid      = "FeatureStore"
+        Effect   = "Allow"
+        Action   = ["sagemaker:PutRecord", "sagemaker:CreateFeatureGroup", "sagemaker:DescribeFeatureGroup"]
+        Resource = "*"
+      },
+      {
+        Sid      = "CloudWatchLogs"
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "arn:aws:logs:*:*:log-group:/aws-glue/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "data_engineer" {
+  role       = aws_iam_role.data_engineer.name
+  policy_arn = aws_iam_policy.data_engineer.arn
+}
+
+resource "aws_iam_role" "model_monitor" {
+  name = "${var.project}-${var.environment}-ModelMonitor"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "sagemaker.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+  tags = { Name = "${var.project}-${var.environment}-ModelMonitor" }
+}
+
+resource "aws_iam_policy" "model_monitor" {
+  name        = "${var.project}-${var.environment}-ModelMonitorPolicy"
+  description = "Read only observability policy for the ModelMonitor role"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "CloudWatchMetrics"
+        Effect   = "Allow"
+        Action   = ["cloudwatch:PutMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:PutMetricAlarm", "cloudwatch:DescribeAlarms"]
+        Resource = "*"
+      },
+      {
+        Sid      = "SageMakerReadOnly"
+        Effect   = "Allow"
+        Action   = ["sagemaker:ListProcessingJobs", "sagemaker:DescribeProcessingJob"]
+        Resource = "*"
+      },
+      {
+        Sid      = "S3ArtifactsReadOnly"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = "arn:aws:s3:::${var.project}-${var.environment}-data-*/artifacts/*"
+      },
+      {
+        Sid      = "S3BucketList"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket", "s3:GetBucketLocation"]
+        Resource = "arn:aws:s3:::${var.project}-${var.environment}-data-*"
+      },
+      {
+        Sid      = "CloudWatchLogs"
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "arn:aws:logs:*:*:log-group:/aws/sagemaker/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "model_monitor" {
+  role       = aws_iam_role.model_monitor.name
+  policy_arn = aws_iam_policy.model_monitor.arn
+}
