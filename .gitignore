@@ -11,3 +11,4 @@ __pycache__/
 .localstack/
 venv/
 model/
+rag/index_cache/

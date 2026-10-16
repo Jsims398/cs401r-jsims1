@@ -1,0 +1,6 @@
+faiss-cpu
+ragas
+datasets
+langchain-community<0.4
+langchain-aws
+pytest
