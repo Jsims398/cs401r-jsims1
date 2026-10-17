@@ -31,6 +31,15 @@ def _chunks():
     ]
 
 
+def test_build_index_raises_on_empty_chunk_list():
+    # An empty chunks list previously flowed into embed_fn([]) and then
+    # vectors.shape[1] as an opaque IndexError -- fail clearly instead,
+    # same reasoning as load_raw_documents's empty-corpus-dir guard.
+    import pytest
+    with pytest.raises(ValueError, match="no chunks"):
+        build_index([], _stub_embed_fn)
+
+
 def test_build_index_returns_chunk_index_with_all_chunks():
     idx = build_index(_chunks(), _stub_embed_fn)
     assert isinstance(idx, ChunkIndex)
@@ -82,6 +91,17 @@ def test_cache_key_changes_when_chunk_text_changes():
     k1 = cache_key(_chunks())
     mutated = _chunks()
     mutated[0] = Chunk("A-1", "A", "Doc A", "H1", "DIFFERENT TEXT")
+    k2 = cache_key(mutated)
+    assert k1 != k2
+
+
+def test_cache_key_changes_when_heading_changes():
+    # build_index() embeds c.labeled_text(), which includes the heading --
+    # a heading-only edit changes what's actually embedded, so the cache key
+    # must change too or a stale index gets served silently.
+    k1 = cache_key(_chunks())
+    mutated = _chunks()
+    mutated[0] = Chunk("A-1", "A", "Doc A", "DIFFERENT HEADING", "apple content")
     k2 = cache_key(mutated)
     assert k1 != k2
 

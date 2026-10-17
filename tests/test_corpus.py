@@ -15,6 +15,18 @@ def test_load_raw_documents_extracts_title():
     assert "Summit Rewards" in loy["title"]
 
 
+def test_load_raw_documents_raises_on_empty_or_missing_dir(tmp_path):
+    # A wrong working directory (e.g. running a script from scripts/ instead
+    # of repo root) must fail with a clear message, not silently return []
+    # and let the failure surface three calls later as a numpy AxisError.
+    import pytest
+    with pytest.raises(ValueError, match="no .md documents found"):
+        load_raw_documents(str(tmp_path / "does-not-exist"))
+    tmp_path.mkdir(exist_ok=True)
+    with pytest.raises(ValueError, match="no .md documents found"):
+        load_raw_documents(str(tmp_path))
+
+
 def test_chunk_document_splits_on_level2_headers():
     md = (
         "# Title\n\n**Document ID:** DOC-1\n\n---\n\n"

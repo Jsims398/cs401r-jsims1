@@ -1,7 +1,7 @@
 """Prompt templates adapted from prompt_templates/offer_generation_prompts.md,
 with Template 3's three planted errors corrected and the tier/policy mismatch
-handled via conditional phrasing everywhere (spec decision, lab3-walkthrough.md
-section 5): every tier benefit is phrased as currently-held, not as a
+handled via conditional phrasing everywhere (see docs/lab3-model-design.md):
+every tier benefit is phrased as currently-held, not as a
 permanent fact, because Lab 2's loyalty_tier (derived from lifetime value)
 can disagree with POL-LOY-011's trailing-12-month-spend definition.
 """

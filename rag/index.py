@@ -68,6 +68,8 @@ class ChunkIndex:
 
 def build_index(chunks: list[Chunk],
                  embed_fn: Callable[[list[str]], np.ndarray]) -> ChunkIndex:
+    if not chunks:
+        raise ValueError("no chunks to index -- check the corpus loaded correctly")
     texts = [c.labeled_text() for c in chunks]
     vectors = embed_fn(texts)
     dim = vectors.shape[1]
@@ -77,13 +79,23 @@ def build_index(chunks: list[Chunk],
 
 
 def cache_key(chunks: list[Chunk]) -> str:
-    """Hash of every chunk's id+text, so a corpus or chunking-logic change
-    invalidates a stale cached index instead of silently serving old data."""
+    """Hash of every chunk's id+labeled_text(), plus the embedding model id,
+    so a corpus change, a chunking-logic change, OR a heading-only edit
+    invalidates a stale cached index instead of silently serving old data.
+
+    Hashing chunk_id+text alone (the original version) missed that
+    build_index() actually embeds labeled_text() -- "[doc_id § heading]\\ntext"
+    -- so a heading edit with the body untouched produced an unchanged key
+    over changed embedding input. Also mixing in EMBED_MODEL_ID means
+    switching embedding models invalidates the cache instead of silently
+    loading vectors from a different model."""
     h = hashlib.sha256()
+    h.update(EMBED_MODEL_ID.encode())
+    h.update(b"\0")
     for c in chunks:
         h.update(c.chunk_id.encode())
         h.update(b"\0")
-        h.update(c.text.encode())
+        h.update(c.labeled_text().encode())
         h.update(b"\0")
     return h.hexdigest()
 

@@ -47,6 +47,15 @@ def load_raw_documents(corpus_dir: str = "northstar-policy-docs") -> list[dict]:
             "text": text,
             "path": str(path),
         })
+    if not docs:
+        # A missing or wrong-cwd corpus_dir silently returned [] here, which
+        # flowed into build_index([]) as an opaque numpy IndexError/AxisError
+        # three calls later -- raise where the actual cause is, not where it
+        # happens to blow up.
+        raise ValueError(
+            f"no .md documents found in {corpus_dir!r} -- check the path and "
+            f"that you're running from the repo root"
+        )
     return docs
 
 

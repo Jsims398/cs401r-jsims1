@@ -1,0 +1,22 @@
+{
+  "Arn": "arn:aws:sagemaker:us-east-1:761641207876:mlflow-app/app-DSCTLP23JOQQ",
+  "Name": "northstar-mlflow",
+  "ArtifactStoreUri": "s3://northstar-dev-data-761641207876/artifacts/mlflow/",
+  "MlflowVersion": "3.10.1",
+  "RoleArn": "arn:aws:iam::761641207876:role/northstar-dev-MLEngineer",
+  "Status": "Created",
+  "ModelRegistrationMode": "AutoModelRegistrationDisabled",
+  "CreationTime": "2026-10-13 15:34:22-06:00",
+  "CreatedBy": {
+    "IamIdentity": {
+      "Arn": "arn:aws:iam::761641207876:user/cs401r-lab"
+    }
+  },
+  "LastModifiedTime": "2026-10-13 15:38:44.428000-06:00",
+  "LastModifiedBy": {
+    "IamIdentity": {
+      "Arn": "arn:aws:iam::761641207876:user/cs401r-lab"
+    }
+  },
+  "WeeklyMaintenanceWindowStart": "Mon:04:51"
+}
