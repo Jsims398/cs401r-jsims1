@@ -424,3 +424,64 @@ class TestStoredMetricsGate:
             f"The reference dataset measures 22.0%. Check that your validation "
             f"split is stratified."
         )
+
+
+class TestChampionRegression:
+    """
+    The candidate must not regress against the current champion.
+
+    Champion = the newest Approved package in the Model Registry group. The
+    candidate under test is already registered as PendingManualApproval when
+    CodeBuild runs this, so it can never be its own champion. The champion's
+    AUC comes from the evaluation_metrics.json its ModelMetrics points at, the
+    same file the training job wrote for it.
+
+    AUC_TOLERANCE: the same code on the same data with the same seed reproduces
+    the champion's AUC exactly, so any drop beyond 0.01 is a real change in the
+    data or the model, not noise.
+
+    No Approved package yet (the very first green run) skips with a message:
+    there is nothing to regress against. Approve that run's package and every
+    later build runs this test for real.
+    """
+
+    MODEL_PACKAGE_GROUP = "northstar-churn-models"
+    AUC_TOLERANCE = 0.01
+
+    @pytest.fixture(scope="class")
+    def candidate_auc(self):
+        metrics_path = os.environ.get("EVAL_METRICS_PATH", "/tmp/eval_metrics.json")
+        if not Path(metrics_path).exists():
+            pytest.fail(f"Evaluation metrics not found at {metrics_path}.", pytrace=False)
+        with open(metrics_path) as f:
+            return json.load(f)["auc_roc"]
+
+    @pytest.fixture(scope="class")
+    def champion(self):
+        import boto3
+        sm = boto3.client("sagemaker", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+        approved = sm.list_model_packages(
+            ModelPackageGroupName=self.MODEL_PACKAGE_GROUP,
+            ModelApprovalStatus="Approved",
+            SortBy="CreationTime", SortOrder="Descending", MaxResults=1,
+        )["ModelPackageSummaryList"]
+        if not approved:
+            pytest.skip(f"No Approved package in {self.MODEL_PACKAGE_GROUP} yet; "
+                        f"approve a green run's package to make it the champion.")
+
+        pkg = sm.describe_model_package(ModelPackageName=approved[0]["ModelPackageArn"])
+        uri = pkg["ModelMetrics"]["ModelQuality"]["Statistics"]["S3Uri"]
+        bucket, _, key = uri[len("s3://"):].partition("/")
+        body = boto3.client("s3").get_object(Bucket=bucket, Key=key)["Body"].read()
+        return pkg["ModelPackageVersion"], json.loads(body)["auc_roc"]
+
+    def test_candidate_does_not_regress_vs_champion(self, champion, candidate_auc):
+        version, champ_auc = champion
+        import warnings
+        warnings.warn(f"champion v{version} auc={champ_auc:.4f}; "
+                      f"candidate auc={candidate_auc:.4f}")
+        assert candidate_auc >= champ_auc - self.AUC_TOLERANCE, (
+            f"Candidate AUC {candidate_auc:.4f} regresses more than "
+            f"{self.AUC_TOLERANCE} below champion v{version} ({champ_auc:.4f}). "
+            f"Do not approve this package."
+        )
