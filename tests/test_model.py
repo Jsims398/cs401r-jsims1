@@ -436,9 +436,7 @@ class TestChampionRegression:
     AUC comes from the evaluation_metrics.json its ModelMetrics points at, the
     same file the training job wrote for it.
 
-    AUC_TOLERANCE: the same code on the same data with the same seed reproduces
-    the champion's AUC exactly, so any drop beyond 0.01 is a real change in the
-    data or the model, not noise.
+    AUC_TOLERANCE is the Lab 4 spec: candidate AUC >= champion AUC - 0.02.
 
     No Approved package yet (the very first green run) skips with a message:
     there is nothing to regress against. Approve that run's package and every
@@ -446,7 +444,7 @@ class TestChampionRegression:
     """
 
     MODEL_PACKAGE_GROUP = "northstar-churn-models"
-    AUC_TOLERANCE = 0.01
+    AUC_TOLERANCE = 0.02
 
     @pytest.fixture(scope="class")
     def candidate_auc(self):

@@ -43,7 +43,11 @@ resource "aws_iam_policy" "ml_engineer" {
           "sagemaker:CreateEndpointConfig", "sagemaker:DeleteEndpointConfig",
           "sagemaker:CreateMlflowApp", "sagemaker:DescribeMlflowApp", "sagemaker:ListMlflowApps",
           "sagemaker:CreatePresignedMlflowAppUrl",
-          "sagemaker:RegisterModel", "sagemaker:DescribeModelPackage", "sagemaker:ListModelPackages",
+          # The pipeline's RegisterModel step calls CreateModelPackageGroup on every
+          # run (even when the group exists), then CreateModelPackage.
+          # "sagemaker:RegisterModel" is not a real IAM action and granted nothing.
+          "sagemaker:CreateModelPackageGroup", "sagemaker:DescribeModelPackageGroup",
+          "sagemaker:CreateModelPackage", "sagemaker:DescribeModelPackage", "sagemaker:ListModelPackages",
           "sagemaker:AddTags", "sagemaker:ListTags"
         ]
         Resource = "*"
