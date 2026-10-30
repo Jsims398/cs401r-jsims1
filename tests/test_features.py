@@ -311,3 +311,12 @@ class TestFullFeatureSet:
             snapshot_date=SNAPSHOT_DATE,
         )
         assert "customer_id" in features.columns, "Output must include customer_id for joining"
+
+
+# ── Lab 4 failure demo ─────────────────────────────────────────────────────────
+
+def test_deliberate_failure_for_lab4_demo():
+    """Deliberately failing assertion for the Lab 4 failure demo. Runs in
+    PRE_BUILD, so the build must halt before training and register nothing.
+    Reverted by the next commit."""
+    assert 1 == 2, "DELIBERATE FAILURE: Lab 4 failure demo - revert this commit"
