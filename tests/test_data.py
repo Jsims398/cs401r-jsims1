@@ -286,20 +286,60 @@ class TestFeatures:
             "you anchored to FEATURE_CUTOFF and not to today()"
         )
 
-    # TODO: Add a test proving no feature used post-cutoff data.
-    # Careful: processed/ CONTAINS the holdout purchases (after FEATURE_CUTOFF),
-    # because the label is built from them, so "every customer's max
-    # purchase_date is <= FEATURE_CUTOFF" is false on correct data. Test the
-    # FEATURES instead: recompute the time-sensitive ones (recency, tenure, the
-    # 30/90/180-day frequencies) from processed rows with purchase_date <=
-    # FEATURE_CUTOFF -- your data/feature_engineering.py functions do this --
-    # and assert they equal what the pipeline wrote to features/.
+    def test_no_post_cutoff_leakage(self, processed_df, features_df):
+        """Recompute the time-sensitive features from processed rows on or
+        before FEATURE_CUTOFF and require the pipeline's values to match.
 
-    # TODO: Add a freshness test. The pipeline should refuse to train on a
-    # feature set older than 48 hours. event_time is Fractional epoch seconds:
-    # the wall-clock time your Lab 2 feature job ran, NOT the cutoff T.
-    # Consequence: re-run the northstar-dev-feature-engineer Glue job (~90 s)
-    # before any session in which you will push, or this test fails the build.
+        processed/ legitimately contains holdout purchases (the label is built
+        from them), so the check is on the FEATURES, not on processed dates.
+        A feature computed over the full range (e.g. recency anchored to the
+        last holdout purchase) disagrees with the recomputation and fails here.
+        """
+        from data.feature_engineering import (compute_frequency_features,
+                                              compute_recency_features)
+
+        history = processed_df[processed_df["purchase_date"] <= FEATURE_CUTOFF]
+        expected = compute_recency_features(history, FEATURE_CUTOFF).merge(
+            compute_frequency_features(history, FEATURE_CUTOFF), on="customer_id")
+
+        cols = ["days_since_last_purchase", "customer_tenure_days",
+                "purchase_frequency_30d", "purchase_frequency_90d",
+                "purchase_frequency_180d"]
+        merged = features_df[["customer_id"] + cols].merge(
+            expected, on="customer_id", how="left", suffixes=("", "_expected"))
+
+        missing = merged["days_since_last_purchase_expected"].isna().sum()
+        assert missing == 0, (
+            f"{missing} feature rows have no purchase on or before "
+            f"{FEATURE_CUTOFF.date()} - their features cannot have come from the "
+            f"observation window"
+        )
+        for col in cols:
+            diff = merged[merged[col].astype(float) != merged[f"{col}_expected"]]
+            assert diff.empty, (
+                f"{col} disagrees with a recomputation from pre-cutoff rows for "
+                f"{len(diff)} customers, e.g. "
+                f"{diff[['customer_id', col, col + '_expected']].head(3).to_dict('records')}. "
+                f"The feature job used data after FEATURE_CUTOFF."
+            )
+
+    def test_features_are_fresh(self, features_df):
+        """Refuse to train on a feature set older than 48 hours.
+
+        event_time is epoch seconds of when the Lab 2 feature job ran (wall
+        clock), not the cutoff T. Re-run northstar-dev-feature-engineer before
+        any session in which you push, or this fails the build.
+        """
+        assert "event_time" in features_df.columns, (
+            "Feature set has no event_time column, so its age cannot be checked"
+        )
+        latest = pd.to_datetime(features_df["event_time"].max(), unit="s", utc=True)
+        age = pd.Timestamp.now(tz="UTC") - latest
+        assert age < pd.Timedelta(hours=48), (
+            f"Feature set is {age.total_seconds() / 3600:.1f}h old (event_time "
+            f"{latest.isoformat()}); the limit is 48h. Re-run the "
+            f"northstar-dev-feature-engineer Glue job."
+        )
 
 
 # ── Cross-dataset consistency ─────────────────────────────────────────────────

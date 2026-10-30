@@ -157,11 +157,11 @@ class TestRecencyFeatures:
         empty_txns = pd.DataFrame(columns=["customer_id", "purchase_date", "order_value"])
         customer_ids = pd.DataFrame({"customer_id": ["CUST-NODATA"]})
 
-        # TODO: Your function should handle customers with no transactions
-        # Expected behavior: return days_since_last_purchase = 999 (or configurable sentinel)
-        # features = compute_recency_features(empty_txns, SNAPSHOT_DATE, customer_ids)
-        # assert features.iloc[0]["days_since_last_purchase"] == 999
-        pass
+        features = compute_recency_features(empty_txns, SNAPSHOT_DATE, customer_ids)
+        assert len(features) == 1
+        assert features.iloc[0]["customer_id"] == "CUST-NODATA"
+        assert features.iloc[0]["days_since_last_purchase"] == 999
+        assert features.iloc[0]["customer_tenure_days"] == 0
 
 
 # ── Frequency Feature Tests ────────────────────────────────────────────────────
@@ -286,8 +286,12 @@ class TestFullFeatureSet:
 
     def test_no_null_features_for_known_customers(self, sample_customers, sample_transactions):
         """
-        TODO: After filling missing values, no feature should be NaN for customers
-        who have at least one transaction. Document your null-filling strategy.
+        No feature may be NaN for customers with at least one transaction.
+
+        Null strategy (data/feature_engineering.py): roster customers with no
+        purchases get days_since_last_purchase = 999 and 0 for every count,
+        sum, ratio and tenure; avg_basket_size_6m is 0.0 when there are no
+        orders in the last 180 days (guarded denominator, same as Glue).
         """
         features = build_churn_feature_set(
             customers=sample_customers,
@@ -298,7 +302,7 @@ class TestFullFeatureSet:
         active_customer_ids = sample_transactions["customer_id"].unique()
         active_features = features[features["customer_id"].isin(active_customer_ids)]
         null_counts = active_features[self.REQUIRED_FEATURES].isna().sum()
-        # TODO: Assert null_counts.sum() == 0 (implement after deciding on null strategy)
+        assert null_counts.sum() == 0, f"Null features for active customers: {null_counts[null_counts > 0].to_dict()}"
 
     def test_output_has_customer_id_column(self, sample_customers, sample_transactions):
         features = build_churn_feature_set(
