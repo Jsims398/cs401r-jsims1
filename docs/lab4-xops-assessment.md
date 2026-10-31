@@ -2,7 +2,7 @@
 
 ## Pipeline Stage Mapping
 
-Implementation: **AWS CodePipeline + CodeBuild** (`pipeline.yaml`, `buildspec.yml`). Chosen over GitHub Actions because every downstream resource (SageMaker Pipelines, Model Registry, CloudWatch, SNS) is in the same AWS account, so the build authenticates with an IAM role instead of long-lived keys stored in GitHub secrets.
+Implementation: **AWS CodePipeline + CodeBuild** (`pipeline.yaml`, `buildspec.yml`).
 
 | Required phase | CodePipeline stage | Where it runs |
 | --- | --- | --- |
@@ -12,13 +12,13 @@ Implementation: **AWS CodePipeline + CodeBuild** (`pipeline.yaml`, `buildspec.ym
 | 4. Evaluate | Build | Inside training, `evaluate_model()` raises if precision@10% < 0.50, recall@10% < 0.25 or the lift CI includes 0, so a failing model never registers. CodeBuild then runs `tests/test_model.py` and `tests/test_fairness.py` against the emitted metrics |
 | 5. Register | Build, then ManualApproval | SageMaker Pipeline `RegisterModel` step → `PendingManualApproval` in `northstar-churn-models`. `post_build` rejects the package if a later test fails. The ManualApproval stage emails the approver through SNS |
 
-Three stages, not five: a CodePipeline stage is a hand-off boundary, and Test → Evaluate need no hand-off, so they share one CodeBuild job and one artifact.
+The CodePipeline stage is a hand-off boundary, and Test to Evaluate needed no hand-off, so they share one CodeBuild job and one artifact.
 
 ## Champion-Challenger
 
-A challenger replaces the champion (newest `Approved` package) **if and only if all of these hold**:
+A challenger replaces the champion (newest `Approved` package) if and only if all of these hold:
 
-1. It passed every CI gate: precision@10% ≥ 0.50, recall@10% ≥ 0.25, lift-over-recency 95% CI lower bound > 0.
+1. It passed every CI gate: precision of 10% total data ≥ 0.50, recall of 10% of data ≥ 0.25, lift-over-recency 95% CI lower bound > 0.
 2. **Challenger AUC − champion AUC ≥ +0.010**, measured on the same 30% stratified validation split (`random_state=42`).
 3. Top-10% recall for the Platinum and Gold tiers is not lower than the champion's.
 
@@ -26,9 +26,9 @@ CI enforces a separate, looser floor: `tests/test_model.py::TestChampionRegressi
 
 ## Retraining Triggers
 
-**(a) Scheduled, weekly.** An **Amazon EventBridge Scheduler** schedule `cron(0 5 ? * MON *)` starts the Glue job `northstar-dev-feature-engineer`. A second schedule at `cron(0 6 ? * MON *)` calls CodePipeline `StartPipelineExecution` on `northstar-pipeline`. The one-hour gap keeps `test_features_are_fresh` (48 h limit) green.
+**(a) Scheduled, weekly.** An Amazon EventBridge Scheduler schedules `cron(0 5 ? * MON *)` starts the Glue job `northstar-dev-feature-engineer`. A second schedule at `cron(0 6 ? * MON *)` calls CodePipeline `StartPipelineExecution` on `northstar-pipeline`. The one-hour gap keeps `test_features_are_fresh` (48 h limit) green.
 
-**(b) Performance-based.** Churn labels mature 90 days after scoring. A weekly **SageMaker Model Monitor** model-quality job joins the champion's predictions with matured labels and publishes `auc` to **CloudWatch**. A CloudWatch alarm fires when **production AUC < 0.74 for 2 consecutive weekly datapoints**. 0.74 is the champion's 0.785 minus 0.045, the lower edge of its lift over the recency baseline, so below it the model is barely beating the free rule. An **EventBridge** rule on the alarm's `ALARM` state starts `northstar-pipeline`. A data-quality job on the same monitor also fires the rule if the PSI of `days_since_last_purchase` exceeds 0.2.
+**(b) Performance-based.** Churn labels mature 90 days after scoring. A weekly SageMaker Model Monitor model-quality job joins the champion's predictions with matured labels and publishes `auc` to CloudWatch. A CloudWatch alarm fires when production AUC < 0.74 for 2 consecutive weekly datapoints. 0.74 is the champion's 0.785 minus 0.045, the lower edge of its lift over the recency baseline, so below it the model is barely beating the free rule. An EventBridge rule on the alarm's `ALARM` state starts `northstar-pipeline`. A data-quality job on the same monitor also fires the rule if the PSI of `days_since_last_purchase` exceeds 0.2.
 
 ## DataOps Maturity
 
@@ -42,7 +42,7 @@ CI enforces a separate, looser floor: `tests/test_model.py::TestChampionRegressi
 
 **Gap to Level 3:** Data production is not automated. The Glue job runs only when started by hand, so freshness is detected (the build fails) rather than guaranteed. There is no orchestration linking a new raw drop to the feature job. Terraform state also drifted when the NAT gateway was deleted outside Terraform, and nothing detected it until the Glue job failed on the missing route.
 
-**Top priority investment:** Add an `aws_glue_trigger` of type `SCHEDULED` to `infrastructure/modules/glue/`, plus a nightly `terraform plan -detailed-exitcode` drift check in CodeBuild that alerts through the existing `northstar-model-approvals` SNS topic.
+**Top priority TODO:** Add an `aws_glue_trigger` of type `SCHEDULED` to `infrastructure/modules/glue/`, plus a nightly `terraform plan -detailed-exitcode` drift check in CodeBuild that alerts through the existing `northstar-model-approvals` SNS topic.
 
 ## MLOps Maturity
 
@@ -57,4 +57,4 @@ CI enforces a separate, looser floor: `tests/test_model.py::TestChampionRegressi
 
 **Gap to Level 3:** Nothing runs after registration. There is no deployed endpoint, no production monitoring and no automated retraining; the triggers above are designed, not deployed. CI also starts by hand, because the CodeStar connection has no GitHub App webhook installed.
 
-**Top priority investment:** Install the AWS Connector for GitHub app so pushes trigger `northstar-pipeline`. Then deploy SageMaker Model Monitor with the CloudWatch → EventBridge retraining rule from *Retraining Triggers (b)*.
+**Top priority TODO:** Install the AWS Connector for GitHub app so pushes trigger `northstar-pipeline`. Then deploy SageMaker Model Monitor with the CloudWatch → EventBridge retraining rule from *Retraining Triggers (b)*.
