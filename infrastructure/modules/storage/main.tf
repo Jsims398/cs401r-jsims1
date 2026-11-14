@@ -90,5 +90,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
     status = "Enabled"
     filter { prefix = "datacapture/" }
     expiration { days = 7 }
+    # Versioned bucket: expiration only adds a delete marker. Permanently
+    # delete the hidden version a day later (Lab 5 prereq 6, Task 4).
+    noncurrent_version_expiration { noncurrent_days = 1 }
   }
 }

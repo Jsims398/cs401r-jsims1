@@ -1,0 +1,139 @@
+Lab 5 deployment evidence - account 761641207876
+
+===== 0. Model Registry: versions and approval status  (2026-11-13T23:33:44Z) =====
+--------------------------------------------------------------------
+|                         ListModelPackages                        |
++---+-------------------------+------------------------------------+
+|  9|  Approved               |  2026-11-13T14:57:12.871000-07:00  |
+|  8|  Approved               |  2026-11-13T14:57:03.896000-07:00  |
+|  7|  PendingManualApproval  |  2026-10-29T21:58:31.095000-06:00  |
+|  6|  Rejected               |  2026-10-29T21:34:42.100000-06:00  |
+|  5|  PendingManualApproval  |  2026-10-13T16:18:00.689000-06:00  |
+|  4|  PendingManualApproval  |  2026-10-13T16:16:37.512000-06:00  |
+|  3|  PendingManualApproval  |  2026-10-13T16:13:44.075000-06:00  |
+|  2|  PendingManualApproval  |  2026-10-13T16:10:15.056000-06:00  |
+|  1|  PendingManualApproval  |  2026-10-13T16:07:42.243000-06:00  |
++---+-------------------------+------------------------------------+
+
+===== 1. describe-endpoint: both variants and their weights  (2026-11-13T23:33:45Z) =====
+{
+    "Status": "InService",
+    "Config": "northstar-churn-canary-config",
+    "Variants": [
+        {
+            "Name": "champion",
+            "Weight": 9.0,
+            "Instances": 1
+        },
+        {
+            "Name": "canary",
+            "Weight": 1.0,
+            "Instances": 1
+        }
+    ]
+}
+----------------------------------------------------------
+|                 DescribeEndpointConfig                 |
++----------+----------------------+---------------+------+
+|  champion|  northstar-churn-v8  |  ml.m5.large  |  9.0 |
+|  canary  |  northstar-churn-v9  |  ml.m5.large  |  1.0 |
++----------+----------------------+---------------+------+
+
+===== 2. auto-scaling: register attempt, live targets and policies, quota requests  (2026-11-13T23:33:48Z) =====
+{
+    "ScalableTargetARN": "arn:aws:application-autoscaling:us-east-1:761641207876:scalable-target/056me935974e07084f368a44f03e5ff5e2b8"
+}
+{
+    "ScalableTargets": [
+        {
+            "ServiceNamespace": "sagemaker",
+            "ResourceId": "endpoint/northstar-churn-prod/variant/champion",
+            "ScalableDimension": "sagemaker:variant:DesiredInstanceCount",
+            "MinCapacity": 1,
+            "MaxCapacity": 2,
+            "RoleARN": "arn:aws:iam::761641207876:role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint",
+            "CreationTime": "2026-11-13T16:33:29.176000-07:00",
+            "SuspendedState": {
+                "DynamicScalingInSuspended": false,
+                "DynamicScalingOutSuspended": false,
+                "ScheduledScalingSuspended": false
+            },
+            "ScalableTargetARN": "arn:aws:application-autoscaling:us-east-1:761641207876:scalable-target/056me935974e07084f368a44f03e5ff5e2b8"
+        }
+    ]
+}
+{
+    "ScalingPolicies": [
+        {
+            "PolicyARN": "arn:aws:autoscaling:us-east-1:761641207876:scalingPolicy:e935974e-0708-4f36-8a44-f03e5ff5e2b8:resource/sagemaker/endpoint/northstar-churn-prod/variant/champion:policyName/northstar-churn-champion-invocations",
+            "PolicyName": "northstar-churn-champion-invocations",
+            "ServiceNamespace": "sagemaker",
+            "ResourceId": "endpoint/northstar-churn-prod/variant/champion",
+            "ScalableDimension": "sagemaker:variant:DesiredInstanceCount",
+            "PolicyType": "TargetTrackingScaling",
+            "TargetTrackingScalingPolicyConfiguration": {
+                "TargetValue": 1000.0,
+                "PredefinedMetricSpecification": {
+                    "PredefinedMetricType": "SageMakerVariantInvocationsPerInstance"
+                },
+                "ScaleOutCooldown": 60,
+                "ScaleInCooldown": 600
+            },
+            "Alarms": [
+                {
+                    "AlarmName": "TargetTracking-endpoint/northstar-churn-prod/variant/champion-AlarmHigh-32a1ecd9-860f-47c7-bf4f-5612d920e3aa",
+                    "AlarmARN": "arn:aws:cloudwatch:us-east-1:761641207876:alarm:TargetTracking-endpoint/northstar-churn-prod/variant/champion-AlarmHigh-32a1ecd9-860f-47c7-bf4f-5612d920e3aa"
+                },
+                {
+                    "AlarmName": "TargetTracking-endpoint/northstar-churn-prod/variant/champion-AlarmLow-3679d834-c288-4a17-a217-f7ac1921eea8",
+                    "AlarmARN": "arn:aws:cloudwatch:us-east-1:761641207876:alarm:TargetTracking-endpoint/northstar-churn-prod/variant/champion-AlarmLow-3679d834-c288-4a17-a217-f7ac1921eea8"
+                }
+            ],
+            "CreationTime": "2026-11-13T16:33:30.293000-07:00"
+        }
+    ]
+}
+-------------------------------------------------------------------------------------------------------
+|                               ListRequestedServiceQuotaChangeHistory                                |
++------------------------------------------+------+--------------+------------------------------------+
+|  ml.m5.large for spot training job usage |  5.0 |  CASE_CLOSED |  2026-09-29T20:20:30.136000-06:00  |
+|  ml.m5.large for training job usage      |  2.0 |  CASE_CLOSED |  2026-09-29T20:14:50.805000-06:00  |
++------------------------------------------+------+--------------+------------------------------------+
+
+===== 3. rollback alarm: definition as code, then live state  (2026-11-13T23:33:54Z) =====
+{
+  "AlarmName": "northstar-churn-rollback-canary-latency",
+  "AlarmDescription": "Roll back the canary when its p95 ModelLatency exceeds 200 ms (200000 microseconds) for 3 consecutive 1-minute periods. Action: bash deployment/configs/rollback-action.sh",
+  "Namespace": "AWS/SageMaker",
+  "MetricName": "ModelLatency",
+  "Dimensions": [
+    {"Name": "EndpointName", "Value": "northstar-churn-prod"},
+    {"Name": "VariantName", "Value": "canary"}
+  ],
+  "ExtendedStatistic": "p95",
+  "Period": 60,
+  "EvaluationPeriods": 3,
+  "DatapointsToAlarm": 3,
+  "Threshold": 200000,
+  "ComparisonOperator": "GreaterThanThreshold",
+  "TreatMissingData": "notBreaching",
+  "Unit": "Microseconds"
+}
+----------------------------------------------------------------------------------------------------------
+|                                             DescribeAlarms                                             |
++------------------------------------------+---------------+------+-----------+----+---------------------+
+|  northstar-churn-rollback-canary-latency |  ModelLatency |  p95 |  200000.0 |  3 |  INSUFFICIENT_DATA  |
++------------------------------------------+---------------+------+-----------+----+---------------------+
+
+===== 4. observed traffic split at 9:1  (2026-11-13T23:33:55Z) =====
+canary 16 / champion 184   (n=200)
+
+===== 5. after rollback: weights, then observed split  (2026-11-14T00:36:18Z) =====
+champion	1.0
+canary	0.0
+champion 100   (n=100)
+
+===== 6. after teardown: live API  (2026-11-14T00:37:55Z) =====
+endpoints:        0
+endpoint configs: 0
+scalable targets: 0
